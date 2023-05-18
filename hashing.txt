@@ -1,0 +1,300 @@
+It is very handy to have ways to 
+associate keys with values.
+
+There are many names for this abstract data type (ADT):
+  dictionary
+  java.util.Map           (don't confuse with stream `map`)
+  associative array
+  (php: "array" -- an unfortunate name, already used for a slightly less-general concept)
+  hashes, or hash tables  (the most common implementation)
+  "key/value pairs" (cf. javascript objects)
+
+   Methods: put(key,value), get(key), contains?(key)
+   
+   Hey, these are things we could already do well, with a *balanced* BST:
+      run-time of each is O(log n)
+
+   *** We'll do these operations with a run-time of Θ(1) ! ***
+
+       (but: average case, 
+        and  amortized for repeated-doubling of table, 
+        and  assuming good hash-function)
+
+
+How Hash tables work:
+  To insert a string x into a hash-table, associated with key k:
+      - create an Array[String] of size m
+      - have some "hash function" which is    h : string -> int  (in the range -2G...+2G)
+                ...and seems random-ish, hopefully giving values that seem uniformly distributed over -2G..+2G
+      - insert x into the array at index (h(k) % m)
+      
+  But we must resolve collisions.
+      Canonical way: not an Array[String], but Array[List[String]]
+      older-school: linear probing, quadratic probing, OR also have a secondary hash function h2;
+               store at h1(x), or h1(x)+h2(x),  or h1(x)+2*h2(x), or h1(x)+3*h2(x), ... 
+
+      (Note: Confusingly: this old-school is "closed hashing" = "open addressing";
+              "closed hashing" meaning everything is in the array itself [no outside data-structs like lists];
+               "open addressing" means the actual address might wander outside the actual hashcode%tableSize.
+        So conversely, keeping a list is "closed addressing" and also "open hashing".  But it's confusing enough
+        I'd (a) avoid the terms, and (b) always presume your buckets are further collections.)
+                 
+   because the value spills out into an open range of destinations???
+                Keeping your bucket as a List is "closed hashing")
+  
+      drawbacks of hash-tables (so far):
+         - what is one particular bucket gets v.full?  Performance degrades;
+                rather than List<T>[], keep    BSTree<T>[]
+                Time to look up or store:  Θ(1) -- constant time (???)
+         - what if they fill up?
+                "load factor" α of a hash-table is n/m  --- the average bucket-size
+                Ideally, α < 1  or α < 0.75  .
+                If you exceed the load factor, then re-size your hash-table:
+                     use m’=2*m;   re-hash everything into the new table.
+                     Amortized analysis: still constant-time insert.
+
+           A way of viewing the cost of inserting into hash table:
+              It only takes 1 unit of "real" work (computing the hash and looking at that array-loc)
+              BUT we "charge" 3 units of work -- banking 2.
+              Suppose we have 75 items in our table, and 75 units of work banked.
+              Then we recopy to a 2x sized' table:
+                    This requires 75 units of work, leaving us 0 still banked.
+              Now suppose we continue on, and do 75 more inserts: 
+                    that leaves us with 150 things in our table, and 150 units of work banked.
+                    Our load-factor is back up to our limit, on the next insert
+                    we will double again, using all 150 of our banked time to re-hash our 150 items.
+
+              Up-shot: even with needing to re-size our table (occasionally), our
+                  time-per-insert is constant.
+                  (The constant "3" works if you *double* your array-size;
+                     if you instead expand by 10% or by 300%, then a different constant applies.)
+                   
+
+
+     
+Sample hash functions:
+- ex: add chars, with a=1,b=2, etc.
+       h("cat")   = 3+1+20 = 24
+       h("dingo") = 4+9+12+7+14 = 46
+       h("supercalifragilisticexpialidocious") = ..
+
+   This choice of `h` has lots of collision though:
+       h("act") = 24 = h("x") = h("td") = h("aaaaaaaaaaaaaaaaaaaaaaaa")
+    It also doesn't spread out strings evenly over a large range.
+
+
+- Java String#hashcode
+    https://github.com/openjdk/jdk15/blob/master/src/java.base/share/classes/java/lang/String.java
+  which calls
+    https://github.com/openjdk/jdk15/blob/master/src/java.base/share/classes/java/lang/StringUTF16.java
+    
+  "cat".hashCode()
+  ==
+  99*Math.pow(31,2) + 97*31 + (int)'t'
+
+  [360: reached here after 1 lect]
+
+
+- some specific hash functions:
+    murmur  https://sites.google.com/site/murmurhash/
+    fnv     http://isthe.com/chongo/tech/comp/fnv/ 
+  general info  http://www.partow.net/programming/hashfunctions/#SDBMHashFunction
+
+- constant function: stupid, but it is a *legal* hash function
+
+- ideally want h(i) *uniformly* distributed ...for our *actual* inputs i.
+  (minor note: 
+   even if h(i) is uniform over all 2^32  `int`s, still h(i)%100 is NOT (quite) uniform.)
+
+- cf *secure* hashing
+   a hash function with (hopefully) extra requirements:
+     - looks pseudorandom: can't distinguish h(1), h(2), h(3),    from Random.next(),Random.next(),Random.next()
+     - resistant to pre-image attacks:  Given h, hard to find m such that hash(m)=h
+     - weakly collision resistant:      Given m1, hard to find m2 such that hash(m1)=hash(m2)
+     - strongly collision resistant:    hard to find any two messages m1,m2 such that hash(m1)=hash(m2)
+
+   [These are INFORMAL def'ns; 'hard' is either informal, or if using complexity-theory needs careful thought, due to probabilities.]
+
+  If your hash-table doesn't use a secure hash-function, it can be attacked:
+  DoS if attacker provides many inputs which cause your server's hash-table to degrade.
+
+
+- ADTs implemented hash-tables:   hashSet; HashMap
+
+- Java:
+    import java.util.Map;
+    Map<String,Integer> ages = new Map<>(50);  // initial hash-table capacity
+
+    ages.put("ibarland", 55)
+    ages.put("nokie", 65)
+    ages.get("nokie")
+    ages.getOrDefault("george",0)
+  
+  Of course: don't modify a Map while iterating over it!
+
+
+
+  racket:  (hash 'ibarland 55  'nokie 65)
+
+
+  python "dict" built in:
+    { "ibarland": 55,  "nokie": 65 }
+    { ".en" : "hello",  ".fr":"Bonjour",  ".de":"Guten Tag" }
+    { 17 : "prime" }
+    
+  btw python: 
+    { 3, 4, 5 }   # a set
+
+    {}  # an empty set, or an empty hash??
+
+    
+
+   BUT: if hashing a mutable value?
+    { [2,3,5] : "primes" }
+    { {} : "primes" }
+   Why?
+
+
+* if you override equals you must also ... override hashcode
+  Library code relies on the fact that:
+         if x.hashCode() != y.hashCode(),    then   !x.equals(y)
+
+* don't put things in hash table, if they're mutable! [er, if they have mutable hashcode]:
+    jshell:
+     List<Integer> nums = new List<>();
+     nums.add(2);
+     nums.add(5);
+     nums.add(3);
+     List<Integer> sameNums = List.of(2,5,3);
+
+     nums
+     sameNums
+     nums == sameNums
+     nums.equals(sameNums)
+
+
+     Map<List<Integer>,String> table = new HashMap<>();    // 500 = initial-capacity
+     table.add( nums, "hello" )
+     table
+     table.get(nums)
+     table.get(sameNums)
+
+     nums.add(99)
+     table
+     table.get(nums)    // !!!!
+     sameNums.add(99)   // bug is denied!
+     
+
+   Cf python:
+     nums = [2,5,3]
+     table = { nums: "hello" }     # bug is denied!
+
+     nums = (2,3,5)    # a tuple -- like an immutable list
+     table = { nums: "hello" }
+     nums[1] = 99      # bug is denied!
+       
+  Mutable items are okay, *if* mutability doesn't change hash
+    (which is the case for classes where `.equals` is just `==`):
+
+  import java.util.*;
+  Map<Scanner,Integer> table = new HashMap<>();
+  Scanner s1 = new Scanner("hi there all");
+  Scanner s2 = new Scanner("hi there all");
+  s1 == s2
+  s1.equals(s2)
+
+  table.add(s1)
+  table.get(s1)
+  table.get(s2)
+
+  s1 == table.get(s1)
+  s1.next()
+  s1 == table.get(s1)
+  s1.next()
+
+
+- Java implementation:
+  If a bin gets more than 8 items, they convert it from a list to a BSTree.
+  If it later shrinks below 6, then it converts back to a list.
+  https://github.com/openjdk/jdk15/blob/master/src/java.base/share/classes/java/util/HashMap.java
+
+- HashSet<T> is a particularly easy set-implementation, based on java.util.HashMap<T,Boolean>.
+     (And since sets don't have an ordering, we don't have that weakness of hash tables.)
+     
+- hw q?:   Trade-off of big vs small α
+     Or: how much memory used, for 1M strings (via repeated doubling, and initial m=1),
+         using singly-linked list
+
+
+- Average cost of lookup.
+   - We've already shown that `insert` is Θ(1) *amortized*, even with re-sizing (via repeated doubling)
+     But what about lookup?
+   assumptions:
+      - n = #items stored; m = table-size; 
+        α = n/m = load factor (which we maintain < some constant like 0.75 or 1)
+      - our hash-function distributes keys evenly.  (Not *exactly* true, but usually v.close in practice.)
+      - We'll use linked-list buckets (rather than BSTrees), for analysis.
+      - hash function requires time Θ(1); equality-testing is also constant-time.
+         [Note that for long strings, this isn't quite true.
+          Though the hash-function-computation, if cached,
+          can be folded into the time of the constructor.]
+
+   - Let's show the O(1) bound for lookup (using linked-list buckets):
+
+       - Looking up a non-existant key:
+         We search the entire bucket.
+         But how big is the bucket?  On *average* they're small, but a few might be large?!
+         We compute the *average* by looking at a series of m inserts, and then we'll divide by m:
+           By our assumption, the m lookups are distributed evenly over the m buckets;
+           at each bucket, it searches the full bucket.
+           So those m lookups scan over the items in all buckets, which is n.
+         Thus: the average search-time is n/m = α. 
+         We also have to do one hash, so our overall running time is Θ(1+α). 
+         If we keep α bounded by a constant, this is Θ(1).
+
+       - Look up an extant key:
+         Simplist observation is that it must be < than the search-time for a non-extant key!
+         But we can also calculate the exact average, but summing and dividing by n:
+         - First: how long to search for a particular item x_i, the i'th key inserted?
+                  It's in a bucket; the number of items ahead of it is just the 
+                  number of items added to the hash-table after it, divided by n.
+                  That's (n-i)/m (using our assumption that 1/m'th of elements go into the same bucket).
+                  Plus, one comparison for the actual find, 
+                  for 1+(n-i)/m operations to find the x_i.
+                  [Some buckets are longer than others, but this is the *exact* average over all items.]
+         - Okay, let's look at the time to find each of x_1, x_2, ..., x_n and then divide by n.
+             (all summations are i=1..n -- so n terms):
+             \Sum (1+(n-i)/m) = n + \Sum((n-i)/m) = n + 1/m*\Sum(n-i) = n + 1/m * \Sum(i) = n + 1/m*(n(n+1)/2))
+             = n + n^2/(2m) + n/(2m) = 1/2 * (n^2 + (2m+1)n)/m
+           Dividing this by n gives
+             1/2 * (n + 2m+1)/m = 1/2*(n/m + 2 + 1/m) = 1/2α + 1 + o(1).
+           So the search-time is 1+α/2+1/(2m); if you include the time to do the initial hash,
+           we get 2 + α/2 + 1/(2m) ∈ Θ(1+α).
+           (and again, if we keep α bounded by a constant (like 0.75 or 1), this is Θ(1) lookup!
+         Hash Tables Rule!
+
+   - Q: Hey, why did you make us learn linked lists and binary search trees, if hash tables out-perform?
+     A: BSTs can do one thing hash tables can't: efficiently iterate keys in-order.
+        (In fact, a sparse hash-table has some inefficiency even iterating over keys at all!)
+        Also, linked-lists are used as part of hash tables.
+
+
+
+
+  
+    ==== aside: ring-hashing:
+    There are some interesting ideas in the blog post below:
+  
+  https://www.reddit.com/r/algorithms/comments/89ey30/consistent_hashing_algorithmic_tradeoffs/
+  
+  The scenario is: You want to store items across `m` different machines, and want to look them up by key.  A hash-table could be kept, telling you [for each item] which machine it's stored on. (That is, each bucket in the hash table is an entire machine.)  So given a key `k`, you'd go to machine# `k.hashCode() % m`.  The problem: when new machines come on line, we want to increment `m`.  But if you change the amount you `%` by, nearly all the existing entries would need to be re-distributed (migrated).  For example, if you went from 23 to 24 machines, and one of your hashcodes was 12345, that item would have to get migrated because  the numbers 12345 % 23 and 12345 % 24 are different
+  
+  A solution: "ring hashing": For each server, choose a random int (-2G..+2G); keep these in a sorted list.  When storing an item with key `k`, compute the int `k.hashCode()` but then instead of `...%m`, find the first server whose number is *bigger* than `k.hashCode()` (wrapping around).  This is nice, because when you add a new machine, most data stays put, and you only migrate data that is between the new server's random number, and the one before it.  (That's a big help to that other server -- but your new server is only lightening the load of *one* other, so we need to improve that next:)
+  
+To make it so each server has a fairly equal load, don't choose just one random number for each server; instead choose (say) 50 random numbers for each server.  That way, when you add a new server, you'll migrate a bit of data from 50 other servers (and help 50 others just-a-bit.  Same average-help, but much more evenly distributed).
+  
+
+  [the reddit post describes this, and then describes limitations, and then further approaches.]
+
+
+

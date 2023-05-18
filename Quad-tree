@@ -1,0 +1,113 @@
+== quad-tree
+  A tree where each branch is a point, and there are four children (nw,ne,sw,se)
+  A leaf is an empty tree.
+
+  See first two images in: https://en.wikipedia.org/wiki/Quadtree
+     (1. is clustered points w/ some big empty squares -- good for nearest-neighbor;
+      2. is image-compress, where there are sub-volumes with the same color.  
+         To "pause animation" of gif, do a Save-as and open in Preview.)
+
+
+  Offers fast nearest-neighbors (if balanced):
+    Check your four children, and prune
+      (can get good pruning by first checking the se-most-descendent of your nw child, etc;
+       also note that we always prune away one of the four children of each descendent.)
+     Note that if (say) your ne child is empty, you need to go up to find a non-empty ne-child, and check its descendents.
+  Good for sparse points, or clustered points, if you want nearest-neighbors (e.g. video-game; can add a horizon.).
+  Keeping it balanced isn't easy.
+
+  Also good for regions: images: Either four regions, or a single color for your region.
+     Consider what happens for a circle.
+     generally: when points in contiguous regions have one uniform value-of-interest.
+ 
+  Superseded by k-d trees (below).
+  Can also store: the average value-of-interest for your sub-region, or the max&min ("range tree" coming).
+
+ 
+
+
+== k-d Trees:
+   k dimensions, and "d" for "distance"
+
+Kinda like binary-search tree, except that at each level we split along a different dimension.
+   (E.g. root splits points via x-coord.  1st level down splits by y-coord, and 2nd level down by z-coord.  
+    Then repeat: 4th-level by x-coord again.)
+
+
+- Each branch of the tree corresponds to a point plus an axis-its-splitting
+  (the point could be one of our data-points, or not, depending on how you want to implement)
+- leaf is a single point
+
+
+
+To search for nearest neighbor: O(log n) random  [for n >> 2ᵏ;  it degrades otherwise]
+   recur down to the target point, then as you back out look at all
+     points in regions that aren't pruned out.
+   https://en.wikipedia.org/wiki/File:Kdtreeogg.ogv
+
+
+
+
+Range-Scan not so useful:
+Run-time for Range Scan: O(k * n^{1-1/k}) -- good for k=2 or k=3, but k=100 useless.
+  For n=10^9:
+  k= 3:    3*(10^9)^(2/3 ) =  3* 10^6   = 3/1000 * n
+  k=10:   10*(10^9)^(0.9 ) = 10* 10^8.1 ~ 1.2    * n  [worse than linear search?]
+  k=20:   20*(10^9)^(0.95) = 20* 10^8.5 ~ 3 * n
+
+
+
+
+
+
+== range-tree
+
+   d=1:
+   Just like BSTree, except maybe
+      (a) store all data in leaves, and
+      (b) branches store just the mid-value, and (maybe) the max value
+      
+   You can still enumerate all elements within a range, of course, as usual.
+   (In fact, you can store the intermediate-result as just log(n) sub-trees --
+     and traverse them as a stack that never grows bigger than log(n).)
+
+   You can store, at each branch, many interesting stats:
+       sum of children; average of children; variance; ...
+   Then you can put these together to get e.g. "sum of all x in [a,b]"
+   in O(log(n)) time (instead of time n, or time k + 2log(n))
+
+   You could also have each branch store the best of some-related-value:
+   E.g. entries are web-requests; sorted by timestamp; 
+        and you store the maximum-response-time at each node.
+        Then you can answer "what was slowest response between 06:00 and 09:00?"
+        (and repeatedly answer questions of that form, in time log(n))
+
+
+
+
+  Multidimensional:
+
+   d≥2:   (say, d=3):
+     Base case is as above (d=1), sorted by z coord.
+     otherwise: have a range tree sorted by x,
+         and at every branch, *also* store a d-1 dim range-tree (sorted on the y,z).
+
+
+   ** Range Scan:
+   To find all elements between two points <a1,a2,a3> and <b1,b2,b3>:
+       first find all between [a1,b1].  That gives you log(n) smaller range-trees to look at.
+       For each of those, narrow them down to [a2,b2], and for each of those [a3,b3].
+
+    Running time: For doing those tree-searches: 
+                  2 log(n)     (for first tree endpoints)
+                  + 2log(n)* [ 2log(n) + 2log(n)*{2log(n) + … }]
+                  = 2^d log^d(n) ∈ O(log^d(n))
+                  plus another k for the k results of the range-scan (k ≤ n, of course).
+
+     Similarly, the time to build is O(n log^d(n)) (similar formula to above)
+     
+  Unfortunately, range-scan bound this doesn't scale well to large n with moderate d:
+  For n=10^9 = 2^30, so log(n)=30
+  d= 3:    30^3  = 27*10^3   = 1/30000 * n
+  d=10:    30^10 = 3^10 * 10^10 > 10,000*n  ! (a linear scan would be much better, for n this large)
+  d=20:    30^20 = 3^20 * 10^20 > 10^17 *n  !!

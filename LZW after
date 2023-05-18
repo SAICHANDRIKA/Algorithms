@@ -1,0 +1,149 @@
+Now that we've seen huffman coding, a few thoughts:
+
+   https://youtu.be/IXphvpODviU
+
+   - N.B. English has an entropy of ~ 1b/letter.
+     Btw: song lyrics -- how are they compressed in songbooks (hymnals)?
+     wheel of fortune: 
+          https://www.youtube.com/watch?v=LuSEXMn5VME&t=7
+          (pause at 0m11s to think)
+
+   - LZW compression
+     used in .zip/.gz, .gif, .pdf, .png, .tiff   
+         (at least in parts of those, and w/ some variations)
+         Also used by itty.bitty.site (play with some URLs for fun?)
+     Lempel, Ziv, Welch; 1984 based on a LZ (1977).
+     https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Welch
+
+         [see WP example of "tobeornottobeornottobeorbe"]
+
+         b     a     ba     ba     ab    a    aa     b   a     e      b     e     aba     bab      aa
+result:  010  001   110    0110   0111  0001  1011   ...
+(base10) (2)  (1)   (6)    (6)    (7)   (1)  (11)
+add:     ba   ab    bab    baa    aba   aa   aab
+
+
+         initial dict: a=1,e=5.
+   a  1   001
+   b  2   010
+   c  3   011
+   d  4   100
+   e  5   101
+---------------
+  ba  6   110
+  ab  7   111
+ bab  8  1000
+ baa  9  1001
+ aba 10  1010
+  aa 11  1011
+ aab 12  1100
+       
+ 010 001 110 0110 011100011011   ...
+  b   a  ba  ba
+
+
+   a  1   001
+   b  2   010
+   c  3   011
+   d  4   100
+   e  5   101
+-------------
+  ba  6   110
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+         initial dict: a=1,e=5.
+   a  1   001
+   b  2   010
+   c  3   011
+   d  4   100
+   e  5   101
+---------------
+  ba  6   110
+  ab  7   111
+ bab  8  1000
+ baa  9  1001
+ aba 10  1010
+  aa 11  1011
+ aab 12  1100
+ bae 13  1101
+  eb 14  1110
+  be 15  1111
+  ea 16 10000
+abab 17 10001
+baba 18 10010
+        
+
+
+  - summarize LZW:
+       Encode (sequence of) characters into numbers: start w/ an initial (shared) dictionary;
+       look at prefix of the input, and find the longest string that's in
+       your dictionary.
+     * Cool idea: immediately *after* encoding a chunk of input,
+       think of the one-character-longer string that you *wish* had been
+       in your dictionary, and add it.
+     * Key Observation: the de-coder can re-construct the same dictionary
+       that you build up!  
+       (that's why you add to the dictionary *after*, so the de-coder can
+        still do this.)
+
+     CAREFUL:
+        what if the next word is one that the receiver hasn't *quite* put into
+        their dictionary yet?  
+        One approach is that the sender not use it yet (that was my first instinct).
+        But a smidgen cleverer: the only way this happens if it's the *next* codeword 
+        and the receiver already know all-but-the-last-letter of the next codeword.
+        Moreover, the only way the sender would want to send that is if the next letter
+        (the last of the codeword) is the first of all-but-last-letter.  
+        So it's a repeated letter.
+            Example (from Wikipedia):
+            suppose "cxy" is in dictionary, but "cyx cyxc" is just barely added
+              [it's in encoder's dict, but yet not the decoder's].
+            And, encoder encounters "cxyc".  SO they send that codeword;
+            receiver knows the word is "cxy_", and that that last letter
+            must also be that initial c, so "cxyc"
+
+
+       Q: why not just send the entire final-dictionary along, and not
+       have to let the de-coder make their own?  The dictionary may be
+       about as big as the file we send (indeed, we add to the dictionary
+       for every output-number).
+       
+    - careful: as the code-numbers increase; when they pass a power-of-two
+      we need to increase the bit-width used for each output-number.
+      Just pay attention to how the decoder is one step behind.
+    - last comment on LZW: doesn't have to be chars -> numbers;
+        consider the input alphabet to be over {0,1} and now we work
+        for compressing any data, and have an obvious initial-dictionary.
+
+
+
+     
+
+Another example working through LZW can be found, worked out, at:
+    http://web.mit.edu/6.02/www/currentsemester/handouts/L02_notes.txt
+    by Katrina LaCurts
+Her notes also mention:
+ - you can re-set the dictionary at pre-arranged sizes; that way
+   you handle input-streams whose frequencies change over time.
+ - LZW, perhaps in conjunction with Huffman coding for certain sub-parts,
+   is used in: gif, tiff, png, pdf, zip, gzip.
+
+
+ - btw: Lossy vs Lossless compression
+   (png is lossless; jpg is lossy, and so is mp4.  In fact,
+    a 5min-video of a still image in .mp4 can be 10% of the size of the png.)
+
+
+
+
